@@ -1,13 +1,13 @@
 #!/bin/sh /etc/rc.common
+# 不使用modem，取消这个文件的内容。
+#START=99
+#STOP=10
 
-START=99
-STOP=10
+#start() {
+#    sleep 30
+#    ifup modem
+#}
 
-start() {
-    sleep 30
-    ifup modem
-}
-
-stop() {
-    ifdown modem
-}
+#stop() {
+#    ifdown modem
+#}
