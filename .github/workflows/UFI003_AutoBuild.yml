@@ -64,10 +64,10 @@ jobs:
       run: |
         sudo -E apt-get -y update
         # 🔧【路径修正】使用你的 fork 中的依赖列表
-        sudo -E apt-get -y install $(curl -fsSL https://raw.githubusercontent.com/gitpwz/depend_ubuntu2204_openwrt/refs/heads/main/depend_ubuntu2204_openwrt)
+        sudo -E apt-get -y install $(curl -fsSL https://raw.githubusercontent.com/xuxin1955 /depend_ubuntu2204_openwrt/refs/heads/main/depend_ubuntu2204_openwrt)
         
         # 🔧【路径修正】使用你的 fork 中的 mkbootimg
-        wget https://raw.githubusercontent.com/gitpwz/depend_ubuntu2204_openwrt/main/mkbootimg_10.0.0+r36-9_all.deb
+        wget https://raw.githubusercontent.com/xuxin1955 /depend_ubuntu2204_openwrt/main/mkbootimg_10.0.0+r36-9_all.deb
         sudo dpkg -i mkbootimg_10.0.0+r36-9_all.deb
         sudo apt-get install -f -y
         
