@@ -1,12 +1,10 @@
 #
-# ✅【核心修复】添加 permissions 声明（解决 403 关键！）
-# 🔧【最佳实践】固定所有 action 版本（避免 @master 风险）
-# ⚠️【重要】所有 xuxin1955 路径已替换为 gitpwz
 #
-name: Build_imm_高通410系列
 
-# ✅【安全加固】仅允许在 gitpwz 仓库触发 workflow
+name: Build_imm_高通410系列UFI003,禁用Modem
+
 on:
+  repository_dispatch:
   workflow_dispatch:
     inputs:
       ssh:
@@ -14,17 +12,11 @@ on:
         required: false
         default: 'false'
 
-# ✅【关键权限】必须添加！解决 release 403 问题
-permissions:
-  contents: write  # 允许创建 release
-  actions: write   # 允许管理 workflow runs
-
 env:
-  # 🔧【路径修正】确保指向你的 fork 仓库
   REPO_URL: https://github.com/gitpwz/immortalwrt
   REPO_BRANCH: master
   FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: 'config/8916m.config'
+  CONFIG_FILE: 'config/.config'
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
   UPLOAD_BIN_DIR: false
@@ -34,48 +26,50 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    # ✅【安全过滤】仅在你的仓库运行
-    if: github.repository_owner == 'gitpwz'
-    
+    runs-on: ubuntu-latest  
     steps:
     - name: Checkout
-      uses: actions/checkout@v4  # 🔧 固定 v4 版本
-        
+      uses: actions/checkout@main
+
     - name: Show hardware info
       run: |
         chmod 755 ./scripts/show_hardware_info.sh
         ./scripts/show_hardware_info.sh
   
     - name: Free Disk Space (Ubuntu)
-      uses: jlumbroso/free-disk-space@v1.3.0  # 🔧 固定版本
+      uses: jlumbroso/free-disk-space@main
       with:
+        # this might remove tools that are actually needed,
+        # if set to "true" but frees about 6 GB
         tool-cache: false
+
+        # all of these default to true, but feel free to set to
+        # "false" if necessary for your workflow
         android: true
         dotnet: true
         haskell: true
         large-packages: true
         docker-images: true
         swap-storage: true
-        
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo -E apt-get -y update
-        # 🔧【路径修正】使用你的 fork 中的依赖列表
         sudo -E apt-get -y install $(curl -fsSL https://raw.githubusercontent.com/xuxin1955/depend_ubuntu2204_openwrt/refs/heads/main/depend_ubuntu2204_openwrt)
-        
-        # 🔧【路径修正】使用你的 fork 中的 mkbootimg
         wget https://raw.githubusercontent.com/xuxin1955/depend_ubuntu2204_openwrt/main/mkbootimg_10.0.0+r36-9_all.deb
         sudo dpkg -i mkbootimg_10.0.0+r36-9_all.deb
         sudo apt-get install -f -y
-        
-        # ⚠️【验证】确保 mkbootimg 可用（调试用）
+        # 验证安装
         mkbootimg --help || true
         MKBOOTIMG_PATH=$(which mkbootimg)
-        echo "mkbootimg path: $MKBOOTIMG_PATH"
-        
+        if [ -n "$MKBOOTIMG_PATH" ]; then
+        echo "mkbootimg found at: $MKBOOTIMG_PATH"
+        file "$MKBOOTIMG_PATH"
+        else
+        echo "❌ mkbootimg not found in PATH!"
+        fi
+
         sudo timedatectl set-timezone "$TZ"
         sudo chmod 777 /mnt
         df -hT
@@ -83,8 +77,10 @@ jobs:
     - name: Ensure Python build tools
       run: |
         python3 -m pip install --upgrade pip setuptools wheel
+        python3 -m pip --version
+        python3 -c "import setuptools.build_meta; print('setuptools.build_meta OK')"
         python3 -m pip install Unidecode pyelftools
-        
+
     - name: Clone source code
       working-directory: /mnt
       run: |
@@ -92,7 +88,8 @@ jobs:
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /mnt/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: Custom files
+
+    - name:  files
       run: cp -r files openwrt/files
 
     - name: Load custom feeds
@@ -106,6 +103,7 @@ jobs:
       working-directory: openwrt
       run: |
        ./scripts/feeds update istore
+       
        ./scripts/feeds install -d y -p istore luci-app-store
         
 
@@ -123,21 +121,42 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
         
+        
     - name: SSH connection to Actions
-      uses: csexton/debugger-action@v1  # 🔧 固定版本
-      if: (github.event.inputs.ssh == 'true') && (github.event.inputs.ssh != 'false')
+      uses: csexton/debugger-action@master
+      if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh  != 'false') || contains(github.event.action, 'ssh')
       
     - name: Config defconfig
+      id: config
       run: |
        cd openwrt
        make defconfig
        
     - name: Download package
+      id: package
       run: |
         cd openwrt
         make download -j4 V=s
-        # 🔧 优化：仅删除空文件
-        find dl -size 0 -delete
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
+
+    - name: 查看 openwrt 目录中的文件
+      run: ls -la openwrt/
+      
+           ls -l .config
+      
+           ls -la openwrt/.config
+
+ 
+    - name: 自动上传编译配置
+      uses: actions/upload-artifact@v4
+      with:
+       name: build-config
+       path: |
+         ${{ github.workspace }}/openwrt/.config
+         ${{ github.workspace }}/openwrt/feeds.conf.default
+       include-hidden-files: true
+
 
     - name: Compile the firmware
       id: compile
@@ -146,11 +165,23 @@ jobs:
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
-        
-        # 🔧 优化：安全获取设备名
-        DEVICE_NAME=$(grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' || echo "unknown")
-        echo "DEVICE_NAME=_${DEVICE_NAME}" >> $GITHUB_ENV
+        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
+        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+
+    - name: Check space usage
+      if: (!cancelled())
+      run: df -hT
+
+    - name: Fix Git buffer
+      run: git config --global http.postBuffer 524288000
+
+    - name: Upload bin directory
+      uses: actions/upload-artifact@main
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+      with:
+        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: openwrt/bin
 
     - name: Organize files
       id: organize
@@ -161,39 +192,46 @@ jobs:
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
+    - name: Upload firmware directory
+      uses: actions/upload-artifact@main
+      if: steps.organize.outputs.status == 'success' && !cancelled()
+      with:
+        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: ${{ env.FIRMWARE }}
+
     - name: Generate release tag
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
         echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
-        cat > release.txt <<EOF
-## ImmortalWrt 24.10 高通410系列
-- 管理地址: 192.168.1.1
-- 默认用户: root
-- 默认密码: 空
-EOF
+        touch release.txt
+        [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
+        echo "## Immortalwrt24.10 高通410系列" >> release.txt
+        echo "- 管理地址:192.168.1.1" >> release.txt
+        echo "  默认用户:root" >> release.txt
+        echo "  默认密码:空" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
-        
-    # ✅【终极修复】使用 v1 版本 + 自动权限
+
     - name: Upload firmware to release
-      uses: softprops/action-gh-release@v1  # 🔧 固定 v1 版本
+      uses: softprops/action-gh-release@master
       if: steps.tag.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
-        # ✅ 不需要 GITHUB_TOKEN！系统自动授权（因 permissions 已声明）
-        
-    # ⚠️【重要】清理策略（避免仓库膨胀）
-    - name: Delete old workflow runs
-      uses: Mattraks/delete-workflow-runs@v2  # 🔧 固定版本
+
+    - name: Delete workflow runs
+      uses: Mattraks/delete-workflow-runs@main
       with:
-        retain_days: 1
-        keep_minimum_runs: 3
-        
+        retain_days: 0
+        keep_minimum_runs: 5
     - name: Remove old Releases
-      uses: dev-drprasad/delete-older-releases@v1  # 🔧 固定版本
+      uses: dev-drprasad/delete-older-releases@master
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
-        keep_latest: 3
+        keep_latest: 5
         delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
