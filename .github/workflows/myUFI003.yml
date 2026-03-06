@@ -4,14 +4,9 @@
 name: Build_imm_高通410系列UFI003,禁用Modem
 
 on:
-  #repository_dispatch:
+  repository_dispatch:
   workflow_dispatch:
     inputs:
-      target_branch:
-      description: 'Nomodem0306'
-        required: true
-        default: 'main'
-        type: string
       ssh:
         description: 'SSH connection to Actions'
         required: false
