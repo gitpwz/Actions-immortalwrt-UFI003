@@ -1,7 +1,6 @@
 #
 #
-
-name: Build_imm_高通410系列UFI003,禁用Modem
+name: Main-高通410系列UFI003,禁用Modem
 
 on:
   repository_dispatch:
