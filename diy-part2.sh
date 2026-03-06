@@ -26,23 +26,30 @@ sed -i 's/luci-theme-material/luci-theme-argon/g' feeds/luci/collections/luci/Ma
 # wget https://github.com/Haris131/uz801v3-kernel/commit/55fad55a0f18517d02d66003b5ec70975d46accb.patch -O target/linux/msm89xx/patches-6.6/0097-fix-led-msm8916.patch
 # wget https://github.com/Haris131/uz801v3-kernel/commit/55fad55a0f18517d02d66003b5ec70975d46accb.patch -O target/linux/msm89xx/patches-6.12/0097-fix-led-msm8916.patch
 
-# cat <<EOF >> target/linux/msm89xx/config-6.1
+# 禁用modem相关的内核配置
+cat <<EOF >> target/linux/msm89xx/config-6.1
 
-# CONFIG_BT_QCOMSMD=m
-# CONFIG_QCOM_IPA=m
-# EOF
+# 禁用高通SMD蓝牙支持，这是modem功能的一部分
+# CONFIG_BT_QCOMSMD is not set
+# 禁用高通IPA (Interconnect Performance Analyzer)，这与网络modem相关
+# CONFIG_QCOM_IPA is not set
+EOF
 
-# cat <<EOF >> target/linux/msm89xx/config-6.6
+cat <<EOF >> target/linux/msm89xx/config-6.6
 
-# CONFIG_BT_QCOMSMD=m
-# CONFIG_QCOM_IPA=m
-# EOF
+# 禁用高通SMD蓝牙支持，这是modem功能的一部分
+# CONFIG_BT_QCOMSMD is not set
+# 禁用高通IPA (Interconnect Performance Analyzer)，这与网络modem相关
+# CONFIG_QCOM_IPA is not set
+EOF
 
-# cat <<EOF >> target/linux/msm89xx/config-6.12
+cat <<EOF >> target/linux/msm89xx/config-6.12
 
-# CONFIG_BT_QCOMSMD=m
-# CONFIG_QCOM_IPA=m
-# EOF
+# 禁用高通SMD蓝牙支持，这是modem功能的一部分
+# CONFIG_BT_QCOMSMD is not set
+# 禁用高通IPA (Interconnect Performance Analyzer)，这与网络modem相关
+# CONFIG_QCOM_IPA is not set
+EOF
 
 # HelmiWrt packages
 git clone --depth=1 https://github.com/Haris131/helmiwrt-packages package/community
