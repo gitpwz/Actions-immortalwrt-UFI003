@@ -1,6 +1,5 @@
 #
 #
-
 name: UFI003,禁用Modem
 
 on:
@@ -11,7 +10,7 @@ on:
       description: 'Nomodem0306'
         required: true
         default: 'main'
-        type: string
+        type: choice
    
     
       ssh:
